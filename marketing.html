@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Marketing Agent</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-bg: #111111;
+            --neon-blue: #00f3ff;
+            --text-color: #e0e0e0;
+            --border-glow: 0 0 15px rgba(0, 243, 255, 0.4);
+        }
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: sans-serif; margin: 0; padding: 15px; }
+        h1 { color: var(--neon-blue); text-align: center; letter-spacing: 4px; text-shadow: var(--border-glow); font-size: 1.4rem; }
+        .card { background: var(--panel-bg); border: 1px solid var(--neon-blue); box-shadow: var(--border-glow); border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.7rem; color: var(--neon-blue); font-weight: bold; }
+        .guide-link { font-size: 0.65rem; color: #888; margin-bottom: 8px; display: block; text-decoration: none; }
+        input, textarea, select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 1rem; }
+        .ai-selector { display: flex; gap: 10px; margin-bottom: 15px; }
+        .ai-option { flex: 1; text-align: center; padding: 10px; border: 1px solid #333; cursor: pointer; border-radius: 8px; font-size: 0.8rem; }
+        .ai-option.active { border-color: var(--neon-blue); background: rgba(0, 243, 255, 0.1); box-shadow: var(--border-glow); color: var(--neon-blue); }
+        button#main-btn { width: 100%; background: transparent; border: 1px solid var(--neon-blue); color: var(--neon-blue); padding: 15px; font-weight: bold; cursor: pointer; border-radius: 8px; box-shadow: var(--border-glow); }
+        .idea-item { background: #1a1a1a; border-left: 3px solid var(--neon-blue); padding: 12px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; }
+        .mini-copy-btn { border: 1px solid var(--neon-blue); color: var(--neon-blue); background: none; padding: 6px 12px; font-size: 0.7rem; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <h1>MARKETING AGENT</h1>
+
+    <div class="card">
+        <label>SELECT BRAIN</label>
+        <div class="ai-selector">
+            <div id="opt-gemini" class="ai-option active" onclick="switchAI('gemini')">Gemini (Free)</div>
+            <div id="opt-openai" class="ai-option" onclick="switchAI('openai')">OpenAI (Paid)</div>
+        </div>
+        
+        <label id="key-label">GEMINI API KEY</label>
+        <a id="key-guide" class="guide-link" href="https://aistudio.google.com/app/apikey" target="_blank">🔑 ここから無料でキーを取得できます</a>
+        <input type="password" id="apiKey" placeholder="キーを入力して保存してください">
+        <button onclick="saveKey()" style="font-size: 0.7rem; padding: 5px; width: 100px;">SAVE KEY</button>
+    </div>
+
+    <div class="card">
+        <label>TARGET / TOPIC</label>
+        <textarea id="userInput" rows="4" placeholder="例: AI画像生成の収益化について..."></textarea>
+        <button id="main-btn" onclick="executeAI()">⚡️ Execute Analysis</button>
+    </div>
+
+    <div id="resultContainer" class="card" style="display: none;">
+        <label>IDEAS</label>
+        <div id="output-area"></div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+        window.GoogleGenerativeAI = GoogleGenerativeAI;
+    </script>
+
+    <script>
+        let selectedAI = 'gemini';
+        const guides = {
+            gemini: { label: "GEMINI API KEY", url: "https://aistudio.google.com/app/apikey", text: "🔑 ここから無料でキーを取得できます" },
+            openai: { label: "OPENAI API KEY", url: "https://platform.openai.com/api-keys", text: "🔑 クレジット残高があるキーが必要です" }
+        };
+
+        window.onload = () => loadKey();
+
+        function switchAI(type) {
+            selectedAI = type;
+            document.getElementById('opt-openai').classList.toggle('active', type === 'openai');
+            document.getElementById('opt-gemini').classList.toggle('active', type === 'gemini');
+            document.getElementById('key-label').innerText = guides[type].label;
+            document.getElementById('key-guide').innerText = guides[type].text;
+            document.getElementById('key-guide').href = guides[type].url;
+            loadKey();
+        }
+
+        function saveKey() {
+            localStorage.setItem(selectedAI + '_api_key', document.getElementById('apiKey').value);
+            alert(selectedAI.toUpperCase() + ' キーを保存完了');
+        }
+
+        function loadKey() {
+            document.getElementById('apiKey').value = localStorage.getItem(selectedAI + '_api_key') || "";
+        }
+
+        async function executeAI() {
+            const apiKey = document.getElementById('apiKey').value;
+            const input = document.getElementById('userInput').value;
+            if (!apiKey || !input) return alert("内容を確認してください");
+
+            const output = document.getElementById('output-area');
+            document.getElementById('resultContainer').style.display = "block";
+            output.innerHTML = "📡 Connecting...";
+
+            const prompt = `あなたはマーケティングのプロです。以下のテーマについて、具体的で魅力的な案を5つ、1行ずつ箇条書きで提案してください：${input}`;
+
+            try {
+                let text = "";
+                if (selectedAI === 'gemini') {
+                    const genAI = new window.GoogleGenerativeAI(apiKey);
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    const res = await model.generateContent(prompt);
+                    text = res.response.text();
+                } else {
+                    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: "gpt-4o-mini", messages: [{role:"user", content:prompt}] })
+                    });
+                    const data = await res.json();
+                    text = data.choices[0].message.content;
+                }
+                render(text);
+            } catch (e) { output.innerText = "Error: " + e.message; }
+        }
+
+        function render(text) {
+            const output = document.getElementById('output-area');
+            output.innerHTML = "";
+            text.split('\n').filter(l => l.trim()).forEach(line => {
+                const cleanLine = line.replace(/^\d+[\.\s]*/, '').replace(/^[-*]\s*/, '');
+                const div = document.createElement('div');
+                div.className = 'idea-item';
+                div.innerHTML = `<span>${cleanLine}</span><button class="mini-copy-btn" onclick="copy('${cleanLine.replace(/'/g,"\\'")}')">COPY</button>`;
+                output.appendChild(div);
+            });
+        }
+        function copy(t) { navigator.clipboard.writeText(t).then(()=>alert('Copied!')); }
+    </script>
+</body>
+</html>
